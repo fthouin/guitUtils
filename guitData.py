@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import pickle
+import electrools as et
+
 
 class freqSweepData():
     '''
@@ -46,7 +48,7 @@ class freqSweepData():
         The linear response is the complex ratio between the input and output signal at the fundamental frequency
         :return: 
             np.array: frequencies at the which the response is specified
-            np.arry: the amplitude of the linear response
+            np.arry: the amplitude of the linear response expressed in dBV
             np.array: the phase of the linear response (in deg)
         '''
         amp=[]
@@ -58,7 +60,36 @@ class freqSweepData():
             index=np.argmin(np.abs(freq-f))
             amp.append(np.abs(sTrans[index]))
             phase.append(np.angle(sTrans[index],deg=True))
-        return self.freqs,np.array(amp),np.array(phase)
+        return self.freqs,et.todBAmp(np.array(amp)),np.array(phase)
+    def totalHarmonicDistortion(self):
+        '''
+        Calculates the total harmonic distortion present in the gathered waveforms.
+        It is defined as the ratio of the amplitude contained in the all the harmonics to the amplitude contained in the fundamental (in %)
+        Following from http://www.r-type.org/addtext/add183.htm
+        :return:
+            np.array: frequencies at which the THD is specified
+            np.array: THD for that frequency in the input
+            np.array: THD for that frequency in the output
+        '''
+        THDIn=[]
+        THDOut=[]
+        for wIn,wOut,freq in zip(self.waveIn,self.waveOut,self.freqs):
+            f, sIn = wIn.getPositiveSpectrum()
+            f, sOut = wOut.getPositiveSpectrum()
+            maxHarm=int(np.max(f)/freq)
+            indexFond = np.argmin(np.abs(freq - f))
+            fundIn=np.abs(sIn[indexFond])
+            fundOut=np.abs(sOut[indexFond])
+            thdOut=0
+            thdIn=0
+            for n in range(2,maxHarm):
+                index=np.argmin(np.abs(n*freq-f))
+                thdIn+=np.abs(sIn[index])**2
+                thdOut+=np.abs(sOut[index])**2
+            THDIn.append(np.sqrt(thdIn)/fundIn*100)
+            THDOut.append(np.sqrt(thdOut)/fundOut*100)
+        return self.freqs,THDIn,THDOut
+
     def freqFreqMap(self,plot=False):
         if plot:
             fsIn, fsOut, corrMap=self.plotfreqFreqMap()
